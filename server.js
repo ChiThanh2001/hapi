@@ -3,13 +3,13 @@ const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
 
 const knex = require('knex')({
-    client:'mysql',
+    client:'mysql2',
     connection: {
         host: 'localhost',
         port: 3306,
         user: 'root',
         password: '2142001',
-        database: 'todo'
+        database: 'todoapp'
     }    
 })
 
@@ -25,11 +25,21 @@ const init = async () => {
         handler:async (request,h)=>{
             try {
                 const {username , password} = request.payload
-                const user = await knex.raw(`SELECT * from users WHERE username = ${username}`)
-                return {user}
-                     
+                const user = await knex('users').where({ username }).count('id as count')
+                if(!user[0].count){
+                    return {message: 'incorrect username'}
+                }  
+
+                const pwdInDB = await knex.select('password').from('users')
+
+                const isMatch = await bcrypt.compare(password , pwdInDB[0].password)
+                
+                if(!isMatch){
+                    return {message:'incorrect password'}
+                }
+                return {message:'login successfully'}
             } catch (error) {
-                throw new Error(error)
+                return error
             }
         }
     })
@@ -51,7 +61,7 @@ const init = async () => {
                 const salt = await bcrypt.genSalt(10);
                 const hashedPassword = await bcrypt.hash(password, salt);
                 const insertUser = await knex('users').insert({ username , password : hashedPassword })
-                const retriveUserInsert = knex('users').select().where('username',username)
+                const retriveUserInsert = knex('users').select('id','username').where('username',username)
                 return retriveUserInsert
             } catch (error) {
                 return error
@@ -72,7 +82,7 @@ const init = async () => {
             //     throw new Error(err.message)
             // })
             try {
-                const response = await knex.raw("SELECT * from todos")
+                const response = await knex.raw("SELECT * from todolist")
                 const data = response[0]
                 return {data}
             } catch (error) {
@@ -87,7 +97,7 @@ const init = async () => {
         handler: async (request, h) => {
             const {name} = request.payload
             // console.log(name)
-            // return knex.raw(`INSERT into todo.todos(name) VALUES(${name})`)
+            // return knex.raw(`INSERT into todoapp.todolist(name) VALUES(${name})`)
             // .then(result=>{
             //     console.log(1)
             //     return result
@@ -97,7 +107,7 @@ const init = async () => {
             //     return err
             // })
             try {
-                const response = await knex.raw(`INSERT into todo.todos(name) VALUES("${name}")`) 
+                const response = await knex.raw(`INSERT into todoapp.todolist(name) VALUES("${name}")`) 
                 return response
             } catch (error) {
                 return error.message
@@ -112,7 +122,7 @@ const init = async () => {
             try {
                 const {name} = request.payload
                 const {id} = request.params
-                const result  = await knex.raw(`UPDATE todo.todos SET todos.name="${name}" WHERE id=${id}`)
+                const result  = await knex.raw(`UPDATE todoapp.todolist SET todolist.name="${name}" WHERE id=${id}`)
                 return {result} 
             } catch (error) {
                 return error.message
@@ -125,7 +135,7 @@ const init = async () => {
         path:'/delete/{id}',
         handler: async (request,h)=>{
             const {id} = request.params
-            return knex.raw(`DELETE from todo.todos WHERE id=${id}`)
+            return knex.raw(`DELETE from todoapp.todolist WHERE id=${id}`)
             .then(result=>{
                 return result
             })
@@ -134,7 +144,7 @@ const init = async () => {
             })
 
             // try {
-            //     const result = await knex.raw(`DELETE from todo.todos WHERE id=${id}`)
+            //     const result = await knex.raw(`DELETE from todoapp.todolist WHERE id=${id}`)
             //     return {result}
             // } catch (error) {
             //     throw new Error(error)
