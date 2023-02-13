@@ -26,7 +26,7 @@ const init = async () => {
             try {
                 const {username , password} = request.payload
                 const user = await knex.raw(`SELECT * from users WHERE username = ${username}`)
-
+                return {user}
                      
             } catch (error) {
                 throw new Error(error)
