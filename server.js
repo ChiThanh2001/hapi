@@ -25,11 +25,38 @@ const init = async () => {
         handler:async (request,h)=>{
             try {
                 const {username , password} = request.payload
-                const user = await knex.raw(`SELECT * from users WHERE username = ${username}`)
-                return {user}
-                     
+                const user = await knex('users').where({ username }).count('id as count')
+                if(!user[0].count){
+                    return {message: 'incorrect username'}
+                }  
+
+                const pwdInDB = await knex.select('password').from('users').where('username',username)
+
+                const isMatch = await bcrypt.compare(password , pwdInDB[0].password)
+                
+                if(!isMatch){
+                    return {message:'incorrect password'}
+                }
+
+                const token = jwt.sign({username} , 'chithanh' , {expiresIn:'1h'})
+                const decoded = jwt.verify(token,'chithanh')
+                return {
+                    message:'login successfully',
+                    token
+                }
             } catch (error) {
-                throw new Error(error)
+                console.log(error)
+            }
+        }
+    })
+
+    server.route({
+        method:'POST',
+        path:'/logout',
+        handler: async (request,h)=>{
+            const {isLogout} = request.payload
+            if(isLogout){
+                
             }
         }
     })
@@ -51,7 +78,7 @@ const init = async () => {
                 const salt = await bcrypt.genSalt(10);
                 const hashedPassword = await bcrypt.hash(password, salt);
                 const insertUser = await knex('users').insert({ username , password : hashedPassword })
-                const retriveUserInsert = knex('users').select().where('username',username)
+                const retriveUserInsert = knex('users').select('id','username').where('username',username)
                 return retriveUserInsert
             } catch (error) {
                 return error
@@ -71,7 +98,18 @@ const init = async () => {
             // .catch(err => {
             //     throw new Error(err.message)
             // })
+            const token = request.headers['authorization']
+
+            if(!token){
+                return {error:'Access denied. No token provided.'}
+            }
+
+            const tokenWithoutBearer = token.slice(7)
+            // console.log(token)
+            // console.log(tokenWithoutBearer)
             try {
+                const decoded = jwt.verify(tokenWithoutBearer,'chithanh')
+                // console.log(decoded)
                 const response = await knex.raw("SELECT * from todos")
                 const data = response[0]
                 return {data}
